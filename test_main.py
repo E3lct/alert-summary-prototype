@@ -1,6 +1,6 @@
 import unittest
 
-from main import count_alerts, load_events, local_summary
+from main import count_alerts, load_events, local_summary, prompt_for
 
 
 class SummaryTests(unittest.TestCase):
@@ -20,6 +20,14 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(facts["total"], 0)
         self.assertEqual(facts["selected_ids"], [])
         self.assertIn("没有告警", local_summary(facts))
+
+    def test_prompt_uses_counted_facts_without_event_ids(self):
+        facts = count_alerts(load_events(), 7)
+        prompt = prompt_for(facts)
+        self.assertIn("近7天", prompt)
+        self.assertIn("4次", prompt)
+        self.assertIn("跌倒2次、设备离线2次", prompt)
+        self.assertNotIn("demo-001", prompt)
 
 
 if __name__ == "__main__":

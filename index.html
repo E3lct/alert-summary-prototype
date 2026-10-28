@@ -157,6 +157,24 @@
     .trace .code-label { color: var(--ink); font-weight: 700; }
     .trace .line-explain { margin-top: 13px; color: var(--ink); }
     .trace .line-explain span { display: block; margin: 5px 0; }
+    .prompt-guide {
+      margin-bottom: 22px;
+      padding: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .prompt-guide > p { margin: 0 0 14px; }
+    .prompt-guide code:not(pre code) { padding: 2px 5px; background: #e7f0f5; border-radius: 3px; }
+    .prompt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px; }
+    .prompt-grid h3 { font-size: 1rem; margin: 0 0 7px; }
+    .prompt-grid pre { height: 100%; min-height: 200px; background: #f7fafc; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .prompt-guide .prompt-hint { color: var(--muted); margin: 16px 0 10px; }
+    .prompt-guide ol { padding-left: 1.5em; margin: 8px 0 0; }
+    .prompt-guide li { margin: 8px 0; }
+    .call-code { margin-top: 16px; }
+    .call-code summary { cursor: pointer; color: var(--blue); font-weight: 700; }
+    .call-code pre { margin-top: 9px; }
     .ai-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
     .ai-panel p { color: var(--muted); margin: 0; flex: 1 1 250px; }
     .ai-result {
@@ -182,6 +200,8 @@
       .choices { width: 100%; }
       .choices label { flex: 1; }
       .choices span { width: 100%; }
+      .prompt-grid { grid-template-columns: 1fr; }
+      .prompt-grid pre { min-height: 0; }
     }
   </style>
 </head>
@@ -267,13 +287,51 @@ def count_alerts(events, range_days):
 
     <section class="step" aria-labelledby="step-ai">
       <div class="step-head"><span class="step-number">3</span><div><h2 id="step-ai">让 AI 写说明（可选）</h2><p>这一步只把第 2 步算好的事实交给模型，让它用自然语言表述。</p></div></div>
+      <div class="prompt-guide">
+        <p><strong>Prompt 是发给模型的任务说明。</strong>这里先写一份固定模板：要求它写什么、怎么写、哪些内容不能编造；再把 Python 算出的数字填进空位。</p>
+        <div class="prompt-grid">
+          <div>
+            <h3>固定模板：空位还没填</h3>
+            <pre id="prompt-template">正在读取模板…</pre>
+          </div>
+          <div>
+            <h3>如果调用模型，准备发送的内容</h3>
+            <pre id="prompt-preview">先完成第 2 步统计，这里就会显示填好数字的 Prompt。</pre>
+          </div>
+        </div>
+        <p class="prompt-hint"><code>{range_days}</code>、<code>{total}</code>、<code>{by_type}</code> 是留给程序填写的空位。<code>PROMPT_TEMPLATE.format(...)</code> 会把它们换成“7 天、4 次、跌倒 2 次”等实际统计。</p>
+        <p>程序还会附上一句总规则：<strong id="system-prompt">正在读取…</strong></p>
+        <ol>
+          <li><strong>组装：</strong>Python 先算次数，再用模板生成上方完整 Prompt；模型不负责数原始记录。</li>
+          <li><strong>发送：</strong>Python 把总规则和填好数据的 Prompt 作为两条消息，通过 DeepSeek API 发给模型。</li>
+          <li><strong>接收与核对：</strong>模型返回文字后，页面显示回复；仍要对照第 2 步的次数检查，Prompt 本身不能保证它绝不出错。</li>
+        </ol>
+        <details class="call-code">
+          <summary>看 Python 怎样发送请求（进阶）</summary>
+          <pre><code>response = requests.post(
+    MODEL_URL,
+    headers={"Authorization": f"Bearer {api_key}"},
+    json={
+        "model": MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt_for(facts)},
+        ],
+        "stream": False,
+    },
+    timeout=20,
+)
+response.raise_for_status()
+summary = response.json()["choices"][0]["message"]["content"]</code></pre>
+        </details>
+      </div>
       <div class="ai-panel">
         <button id="ai-button" type="button" disabled>生成 AI 摘要</button>
         <p id="ai-help">先完成第 2 步，再决定是否尝试 AI。</p>
       </div>
       <p class="status" id="ai-status" role="status"></p>
       <div class="ai-result" id="ai-result" hidden></div>
-      <p class="table-note">如果以后配置密钥，Python 才会把上一步算好的次数写进 Prompt，再请求模型 API。模型负责写说明，不负责数次数。</p>
+      <p class="table-note">上面的 Prompt 只是预览，不代表已经发给模型。当前模板与请求代码已写好；只有配置密钥并成功点击“生成 AI 摘要”，才能看到模型回复。</p>
     </section>
 
     <div class="flow"><strong>你刚才做了什么？</strong> 点击按钮 → 网页把范围发给 FastAPI → Python 读取模拟数据并统计 → 网页显示结果。</div>
@@ -342,8 +400,12 @@ def count_alerts(events, range_days):
       try {
         const data = await readJson("/api/config");
         aiAvailable = data.ai_available;
+        $("prompt-template").textContent = data.prompt_template;
+        $("system-prompt").textContent = data.system_prompt;
       } catch {
         aiAvailable = false;
+        $("prompt-template").textContent = "模板暂时读取失败，请刷新页面。";
+        $("system-prompt").textContent = "总规则暂时读取失败。";
       }
       updateAiButton();
     }
@@ -363,6 +425,7 @@ def count_alerts(events, range_days):
         $("count-result").hidden = true;
         $("trace").hidden = true;
         $("ai-result").hidden = true;
+        $("prompt-preview").textContent = "范围已改变，请重新统计，生成对应的 Prompt。";
         $("count-status").textContent = "范围已改变，点“统计告警”重新计算。";
         showSelection(null);
         updateAiButton();
@@ -376,6 +439,7 @@ def count_alerts(events, range_days):
       $("count-result").hidden = true;
       $("trace").hidden = true;
       $("ai-result").hidden = true;
+      $("prompt-preview").textContent = "正在把本次统计填进模板…";
       lastRange = null;
       showSelection(null);
       updateAiButton();
@@ -398,10 +462,12 @@ def count_alerts(events, range_days):
         $("trace-condition").textContent = `0 <= days_ago < ${facts.range_days}`;
         $("trace-selected").textContent = facts.total;
         $("trace").hidden = false;
+        $("prompt-preview").textContent = data.prompt_preview;
         $("count-status").textContent = "统计完成。可以换一个天数再试。";
         lastRange = range;
       } catch {
         $("count-status").textContent = "统计失败，请确认本地服务还在运行，再试一次。";
+        $("prompt-preview").textContent = "统计失败，暂时没有可填入模板的结果。";
       } finally {
         $("count-button").disabled = false;
         updateAiButton();

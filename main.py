@@ -16,7 +16,18 @@ load_dotenv()
 app = FastAPI(title="告警摘要练习原型")
 EVENTS_FILE = Path(__file__).with_name("sample_events.json")
 MODEL_URL = "https://api.deepseek.com/chat/completions"
+MODEL_NAME = "deepseek-flash"
 TYPE_LABELS = {"fall": "跌倒", "offline": "设备离线", "signal_low": "信号偏弱"}
+SYSTEM_PROMPT = "你只根据提供的统计事实写简短中文摘要。"
+PROMPT_TEMPLATE = (
+    "请根据下面的模拟告警统计写两句话。\n"
+    "第一句准确概括统计范围和次数；第二句给出谨慎的检查建议。\n"
+    "不要编造原因、额外次数或医学诊断。\n"
+    "如果没有告警，只说明当前范围内无告警，不推断设备绝对安全。\n\n"
+    "统计范围：近{range_days}天\n"
+    "告警总数：{total}次\n"
+    "分类次数：{by_type}"
+)
 
 
 class SummaryRequest(BaseModel):
@@ -50,19 +61,14 @@ def local_summary(facts):
 
 
 def prompt_for(facts):
-    readable_counts = {
-        TYPE_LABELS.get(kind, kind): count
+    readable_counts = "、".join(
+        f"{TYPE_LABELS.get(kind, kind)}{count}次"
         for kind, count in facts["by_type"].items()
-    }
-    summary_facts = {
-        "range_days": facts["range_days"],
-        "total": facts["total"],
-        "by_type": readable_counts,
-    }
-    return (
-        "请仅根据以下模拟告警统计写两句话：第一句准确概括次数，第二句给出谨慎的检查建议。"
-        "不要编造原因、额外次数或医学诊断。\n"
-        f"统计数据：{json.dumps(summary_facts, ensure_ascii=False)}"
+    ) or "无"
+    return PROMPT_TEMPLATE.format(
+        range_days=facts["range_days"],
+        total=facts["total"],
+        by_type=readable_counts,
     )
 
 
@@ -79,7 +85,11 @@ def health_check():
 @app.get("/api/config")
 def get_config():
     key = os.getenv("DEEPSEEK_API_KEY")
-    return {"ai_available": bool(key and key != "replace_with_your_key")}
+    return {
+        "ai_available": bool(key and key != "replace_with_your_key"),
+        "system_prompt": SYSTEM_PROMPT,
+        "prompt_template": PROMPT_TEMPLATE,
+    }
 
 
 @app.get("/api/events")
@@ -90,7 +100,12 @@ def list_events():
 @app.post("/api/summary")
 def create_summary(request: SummaryRequest):
     facts = count_alerts(load_events(), request.range_days)
-    return {"source": "synthetic", "facts": facts, "summary": local_summary(facts)}
+    return {
+        "source": "synthetic",
+        "facts": facts,
+        "summary": local_summary(facts),
+        "prompt_preview": prompt_for(facts),
+    }
 
 
 @app.post("/api/ai-summary")
@@ -105,9 +120,9 @@ def create_ai_summary(request: SummaryRequest):
             MODEL_URL,
             headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "model": "deepseek-chat",
+                "model": MODEL_NAME,
                 "messages": [
-                    {"role": "system", "content": "你只根据提供的统计事实写简短中文摘要。"},
+                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt_for(facts)},
                 ],
                 "stream": False,
