@@ -82,6 +82,28 @@
     th { color: var(--muted); font-size: .9rem; font-weight: 600; background: #edf4f8; }
     tr + tr td { border-top: 1px solid #e7eef3; }
     .table-note { margin: 10px 0 0; color: var(--muted); font-size: .88rem; }
+    .selection-cell { white-space: nowrap; color: var(--muted); }
+    .selection-cell.included { color: #17694f; font-weight: 700; }
+    .selection-cell.excluded { color: #7b8993; }
+    .raw-data {
+      margin-top: 22px;
+      padding: 16px 18px;
+      background: #eaf2f7;
+      border-left: 3px solid var(--blue);
+    }
+    .raw-data h3, .trace h3 { margin: 0 0 5px; font-size: 1.06rem; }
+    .raw-data p, .trace p { margin: 5px 0 12px; color: var(--muted); }
+    pre {
+      overflow-x: auto;
+      margin: 0;
+      padding: 14px 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: #163247;
+      font: .9rem/1.6 Consolas, "Cascadia Code", monospace;
+      tab-size: 4;
+    }
     .controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: end; }
     .choices { display: flex; gap: 8px; flex-wrap: wrap; }
     .choices label { cursor: pointer; }
@@ -120,7 +142,7 @@
       border-radius: 9px;
       overflow: hidden;
     }
-    .result[hidden], .ai-result[hidden] { display: none; }
+    .result[hidden], .ai-result[hidden], .trace[hidden] { display: none; }
     .total-box { background: #e5f2f8; padding: 23px 25px; }
     .total-box strong { display: block; font-size: 3rem; line-height: 1.1; color: var(--navy); }
     .total-box span { color: var(--muted); }
@@ -128,6 +150,13 @@
     .result-detail h3 { font-size: 1.05rem; margin: 0 0 8px; }
     .result-detail p { margin: 6px 0; }
     .fact-note { color: #1c6b57; font-weight: 600; }
+    .trace { margin-top: 26px; }
+    .trace ol { padding-left: 1.5em; margin: 8px 0 18px; }
+    .trace li { padding-left: .2em; margin: 8px 0; }
+    .trace code:not(pre code) { padding: 2px 5px; background: #e7f0f5; border-radius: 3px; }
+    .trace .code-label { color: var(--ink); font-weight: 700; }
+    .trace .line-explain { margin-top: 13px; color: var(--ink); }
+    .trace .line-explain span { display: block; margin: 5px 0; }
     .ai-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
     .ai-panel p { color: var(--muted); margin: 0; flex: 1 1 250px; }
     .ai-result {
@@ -145,6 +174,8 @@
       main { padding: 27px 18px 54px; }
       .step { padding: 28px 0; }
       .step-head { gap: 12px; }
+      th, td { padding: 10px 8px; font-size: .88rem; }
+      th:first-child, td:first-child { display: none; }
       .result { grid-template-columns: 1fr; gap: 0; }
       .result-detail { padding: 18px 22px; }
       .controls button, .ai-panel button { width: 100%; }
@@ -172,11 +203,16 @@
       <div class="step-head"><span class="step-number">1</span><div><h2 id="step-data">先看模拟告警</h2><p>这份练习数据共有 6 条。每条记录有一种告警类型，以及发生在几天前。</p></div></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th scope="col">记录</th><th scope="col">告警类型</th><th scope="col">发生时间</th></tr></thead>
-          <tbody id="event-rows"><tr><td colspan="3">正在读取模拟数据…</td></tr></tbody>
+          <thead><tr><th scope="col">记录</th><th scope="col">告警类型</th><th scope="col">发生时间</th><th scope="col">本次统计</th></tr></thead>
+          <tbody id="event-rows"><tr><td colspan="4">正在读取模拟数据…</td></tr></tbody>
         </table>
       </div>
       <p class="table-note" id="events-status" role="status"></p>
+      <div class="raw-data">
+        <h3>Python 读到的原始数据</h3>
+        <p>这就是 <code>sample_events.json</code> 的内容。JSON 是保存数据的一种文字格式；<code>days_ago</code> 的 0 表示今天，1 表示昨天。<code>fall</code> 是跌倒，<code>offline</code> 是设备离线，<code>signal_low</code> 是信号偏弱。</p>
+        <pre id="raw-json">正在读取…</pre>
+      </div>
     </section>
 
     <section class="step" aria-labelledby="step-count">
@@ -187,7 +223,7 @@
           <label><input type="radio" name="range" value="7" checked><span>近 7 天</span></label>
           <label><input type="radio" name="range" value="30"><span>近 30 天</span></label>
         </div>
-        <button id="count-button" type="button">统计告警</button>
+        <button id="count-button" type="button" disabled>统计告警</button>
       </div>
       <p class="status" id="count-status" role="status">选好范围后，点“统计告警”。</p>
       <div class="result" id="count-result" hidden>
@@ -199,6 +235,34 @@
           <p class="fact-note">这些数字由 Python 算出，不是 AI 猜的。</p>
         </div>
       </div>
+      <div class="trace" id="trace" hidden>
+        <h3>Python 刚才怎样算的？</h3>
+        <ol>
+          <li><code>json.load</code> 读取上面的文件，得到 <strong id="trace-input">6</strong> 条记录。</li>
+          <li>逐条检查 <code id="trace-condition">0 &lt;= days_ago &lt; 7</code>；表格中标“纳入”的 <strong id="trace-selected">4</strong> 条留下，其余排除。</li>
+          <li><code>Counter</code> 按告警类型计数；<code>len(selected)</code> 得到总数。</li>
+        </ol>
+        <p class="code-label">这是 <code>main.py</code> 中读取与统计的代码：</p>
+        <pre><code>def load_events():
+    with EVENTS_FILE.open(encoding="utf-8") as file:
+        return json.load(file)
+
+def count_alerts(events, range_days):
+    selected = [event for event in events if 0 &lt;= event["days_ago"] &lt; range_days]
+    by_type = Counter(event["type"] for event in selected)
+    return {
+        "range_days": range_days,
+        "total": len(selected),
+        "by_type": dict(sorted(by_type.items())),
+        "selected_ids": [event["id"] for event in selected],
+    }</code></pre>
+        <p class="line-explain">
+          <span><strong>events</strong>：由 6 条记录组成的列表；<strong>event</strong> 是其中一条记录。</span>
+          <span><strong>selected</strong>：留下符合天数范围的记录。</span>
+          <span><strong>by_type</strong>：分别数“跌倒、设备离线”等类型。</span>
+          <span><strong>total</strong>：留下多少条，告警总数就是多少。</span>
+        </p>
+      </div>
     </section>
 
     <section class="step" aria-labelledby="step-ai">
@@ -209,6 +273,7 @@
       </div>
       <p class="status" id="ai-status" role="status"></p>
       <div class="ai-result" id="ai-result" hidden></div>
+      <p class="table-note">如果以后配置密钥，Python 才会把上一步算好的次数写进 Prompt，再请求模型 API。模型负责写说明，不负责数次数。</p>
     </section>
 
     <div class="flow"><strong>你刚才做了什么？</strong> 点击按钮 → 网页把范围发给 FastAPI → Python 读取模拟数据并统计 → 网页显示结果。</div>
@@ -219,6 +284,16 @@
     const $ = (id) => document.getElementById(id);
     let lastRange = null;
     let aiAvailable = false;
+    const eventCells = new Map();
+    let eventCount = 0;
+
+    function showSelection(selectedIds) {
+      const included = selectedIds === null ? null : new Set(selectedIds);
+      eventCells.forEach((cell, id) => {
+        cell.textContent = included === null ? "待统计" : included.has(id) ? "纳入" : "排除";
+        cell.className = "selection-cell" + (included === null ? "" : included.has(id) ? " included" : " excluded");
+      });
+    }
 
     function describeDay(days) {
       if (days === 0) return "今天";
@@ -237,6 +312,9 @@
         const data = await readJson("/api/events");
         const rows = $("event-rows");
         rows.replaceChildren();
+        eventCells.clear();
+        eventCount = data.items.length;
+        $("raw-json").textContent = JSON.stringify(data.items, null, 2);
         data.items.forEach((event, index) => {
           const row = document.createElement("tr");
           [`第 ${index + 1} 条`, typeLabels[event.type] || event.type, describeDay(event.days_ago)]
@@ -245,11 +323,17 @@
               cell.textContent = value;
               row.append(cell);
             });
+          const selection = document.createElement("td");
+          row.append(selection);
+          eventCells.set(event.id, selection);
           rows.append(row);
         });
+        showSelection(null);
+        $("count-button").disabled = false;
         $("events-status").textContent = "上面是练习数据，时间按“今天、昨天、几天前”计算。";
       } catch {
         $("event-rows").replaceChildren();
+        $("raw-json").textContent = "原始数据暂时无法读取。";
         $("events-status").textContent = "模拟数据暂时加载失败，请刷新页面再试。";
       }
     }
@@ -273,13 +357,27 @@
           : "已准备好：点击后会调用模型 API，生成两句说明。";
     }
 
+    document.querySelectorAll('input[name="range"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        lastRange = null;
+        $("count-result").hidden = true;
+        $("trace").hidden = true;
+        $("ai-result").hidden = true;
+        $("count-status").textContent = "范围已改变，点“统计告警”重新计算。";
+        showSelection(null);
+        updateAiButton();
+      });
+    });
+
     $("count-button").addEventListener("click", async () => {
       const range = Number(document.querySelector('input[name="range"]:checked').value);
       $("count-button").disabled = true;
       $("count-status").textContent = "正在让 Python 统计模拟告警…";
       $("count-result").hidden = true;
+      $("trace").hidden = true;
       $("ai-result").hidden = true;
       lastRange = null;
+      showSelection(null);
       updateAiButton();
       try {
         const data = await readJson("/api/summary", {
@@ -295,6 +393,11 @@
         $("type-counts").textContent = parts.length ? parts.join("，") : "这段时间没有告警。";
         $("local-summary").textContent = data.summary;
         $("count-result").hidden = false;
+        showSelection(facts.selected_ids);
+        $("trace-input").textContent = eventCount;
+        $("trace-condition").textContent = `0 <= days_ago < ${facts.range_days}`;
+        $("trace-selected").textContent = facts.total;
+        $("trace").hidden = false;
         $("count-status").textContent = "统计完成。可以换一个天数再试。";
         lastRange = range;
       } catch {

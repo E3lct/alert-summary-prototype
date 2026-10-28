@@ -8,6 +8,7 @@ class SummaryTests(unittest.TestCase):
         facts = count_alerts(load_events(), 7)
         self.assertEqual(facts["total"], 4)
         self.assertEqual(facts["by_type"], {"fall": 2, "offline": 2})
+        self.assertEqual(facts["selected_ids"], ["demo-001", "demo-002", "demo-003", "demo-004"])
 
     def test_one_day_includes_only_today(self):
         facts = count_alerts(load_events(), 1)
@@ -17,6 +18,7 @@ class SummaryTests(unittest.TestCase):
     def test_no_matching_events(self):
         facts = count_alerts([], 7)
         self.assertEqual(facts["total"], 0)
+        self.assertEqual(facts["selected_ids"], [])
         self.assertIn("没有告警", local_summary(facts))
 
 

@@ -35,6 +35,7 @@ def count_alerts(events, range_days):
         "range_days": range_days,
         "total": len(selected),
         "by_type": dict(sorted(by_type.items())),
+        "selected_ids": [event["id"] for event in selected],
     }
 
 
@@ -53,10 +54,15 @@ def prompt_for(facts):
         TYPE_LABELS.get(kind, kind): count
         for kind, count in facts["by_type"].items()
     }
+    summary_facts = {
+        "range_days": facts["range_days"],
+        "total": facts["total"],
+        "by_type": readable_counts,
+    }
     return (
         "请仅根据以下模拟告警统计写两句话：第一句准确概括次数，第二句给出谨慎的检查建议。"
         "不要编造原因、额外次数或医学诊断。\n"
-        f"统计数据：{json.dumps({**facts, 'by_type': readable_counts}, ensure_ascii=False)}"
+        f"统计数据：{json.dumps(summary_facts, ensure_ascii=False)}"
     )
 
 
