@@ -13,10 +13,12 @@
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn main:app --reload
+.\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8766
 ```
 
-打开 <http://127.0.0.1:8000/docs>，依次试：
+打开 <http://127.0.0.1:8766/>，按中文页面的顺序操作：先看模拟告警，再选天数并统计，最后可选尝试 AI 摘要。初学时不用看接口文档。
+
+如果你想检查接口，可以再打开 <http://127.0.0.1:8766/docs>：
 
 1. `GET /health`：确认服务启动。
 2. `GET /api/events`：查看六条虚构事件。

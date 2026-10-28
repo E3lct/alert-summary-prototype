@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>告警摘要练习</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #173247;
+      --muted: #526b7e;
+      --navy: #163c58;
+      --blue: #176f9b;
+      --blue-soft: #e8f3f9;
+      --line: #cbdce7;
+      --paper: #ffffff;
+      --page: #f4f8fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      line-height: 1.65;
+    }
+    button, input { font: inherit; }
+    a { color: var(--blue); }
+    .topbar {
+      background: var(--navy);
+      color: #fff;
+    }
+    .topbar-inner {
+      max-width: 940px;
+      min-height: 64px;
+      padding: 12px 26px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+    .signal { display: flex; align-items: end; gap: 3px; height: 23px; }
+    .signal span { display: block; width: 4px; background: #72c8df; border-radius: 3px; }
+    .signal span:nth-child(1) { height: 9px; }
+    .signal span:nth-child(2) { height: 17px; }
+    .signal span:nth-child(3) { height: 12px; }
+    .signal span:nth-child(4) { height: 22px; }
+    .topbar a { color: #dceff7; font-size: .9rem; text-decoration: none; }
+    .topbar a:hover { text-decoration: underline; }
+    main { max-width: 940px; margin: 0 auto; padding: 38px 26px 70px; }
+    .intro { border-bottom: 2px solid var(--navy); padding-bottom: 32px; }
+    .intro h1 { font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.28; letter-spacing: -.035em; margin: 0 0 12px; }
+    .intro > p { max-width: 66ch; margin: 0; color: var(--muted); font-size: 1.02rem; }
+    .notice {
+      margin-top: 22px;
+      padding: 12px 16px;
+      border-left: 4px solid var(--blue);
+      background: var(--blue-soft);
+      color: var(--ink);
+      font-size: .94rem;
+    }
+    .step { padding: 34px 0; border-bottom: 1px solid var(--line); }
+    .step-head { display: flex; align-items: start; gap: 17px; margin-bottom: 20px; }
+    .step-number {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--navy);
+      color: #fff;
+      font-weight: 700;
+    }
+    h2 { font-size: 1.42rem; margin: 0; line-height: 1.4; }
+    .step-head p { color: var(--muted); margin: 5px 0 0; }
+    .table-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 17px; }
+    th { color: var(--muted); font-size: .9rem; font-weight: 600; background: #edf4f8; }
+    tr + tr td { border-top: 1px solid #e7eef3; }
+    .table-note { margin: 10px 0 0; color: var(--muted); font-size: .88rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: end; }
+    .choices { display: flex; gap: 8px; flex-wrap: wrap; }
+    .choices label { cursor: pointer; }
+    .choices input { position: absolute; opacity: 0; }
+    .choices span {
+      display: inline-block;
+      min-width: 76px;
+      padding: 9px 14px;
+      text-align: center;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      font-weight: 600;
+    }
+    .choices input:checked + span { border-color: var(--blue); color: #fff; background: var(--blue); }
+    .choices input:focus-visible + span, button:focus-visible, a:focus-visible { outline: 3px solid #f6a940; outline-offset: 3px; }
+    button {
+      padding: 10px 19px;
+      border: 0;
+      border-radius: 7px;
+      color: #fff;
+      background: var(--navy);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { background: #245a7c; }
+    button:disabled { cursor: not-allowed; color: #617688; background: #dce5eb; }
+    .status { min-height: 1.5em; margin: 13px 0 0; color: var(--muted); font-size: .93rem; }
+    .result {
+      display: grid;
+      grid-template-columns: minmax(150px, 210px) 1fr;
+      gap: 24px;
+      margin-top: 16px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      overflow: hidden;
+    }
+    .result[hidden], .ai-result[hidden] { display: none; }
+    .total-box { background: #e5f2f8; padding: 23px 25px; }
+    .total-box strong { display: block; font-size: 3rem; line-height: 1.1; color: var(--navy); }
+    .total-box span { color: var(--muted); }
+    .result-detail { padding: 20px 22px 20px 0; }
+    .result-detail h3 { font-size: 1.05rem; margin: 0 0 8px; }
+    .result-detail p { margin: 6px 0; }
+    .fact-note { color: #1c6b57; font-weight: 600; }
+    .ai-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+    .ai-panel p { color: var(--muted); margin: 0; flex: 1 1 250px; }
+    .ai-result {
+      margin-top: 17px;
+      padding: 18px 20px;
+      background: var(--paper);
+      border-left: 4px solid var(--blue);
+      white-space: pre-wrap;
+    }
+    .flow { margin-top: 28px; padding: 17px 20px; color: var(--muted); background: #e9f1f6; border-radius: 8px; }
+    .flow strong { color: var(--ink); }
+    footer { color: var(--muted); font-size: .9rem; margin-top: 22px; }
+    @media (max-width: 640px) {
+      .topbar-inner { padding: 12px 18px; }
+      main { padding: 27px 18px 54px; }
+      .step { padding: 28px 0; }
+      .step-head { gap: 12px; }
+      .result { grid-template-columns: 1fr; gap: 0; }
+      .result-detail { padding: 18px 22px; }
+      .controls button, .ai-panel button { width: 100%; }
+      .choices { width: 100%; }
+      .choices label { flex: 1; }
+      .choices span { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="signal" aria-hidden="true"><span></span><span></span><span></span><span></span></span>告警摘要练习</div>
+      <a href="https://github.com/E3lct/alert-summary-prototype">查看项目说明</a>
+    </div>
+  </header>
+  <main>
+    <div class="intro">
+      <h1>先算清告警，<br>再让 AI 写说明。</h1>
+      <p>跟着下面三步，看看网页怎样把一份告警记录交给 Python 处理。先体验统计功能，不需要懂接口术语。</p>
+      <div class="notice">这是独立练习：下面全是虚构数据，没有连接 WiCare 设备或线上系统。</div>
+    </div>
+
+    <section class="step" aria-labelledby="step-data">
+      <div class="step-head"><span class="step-number">1</span><div><h2 id="step-data">先看模拟告警</h2><p>这份练习数据共有 6 条。每条记录有一种告警类型，以及发生在几天前。</p></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">记录</th><th scope="col">告警类型</th><th scope="col">发生时间</th></tr></thead>
+          <tbody id="event-rows"><tr><td colspan="3">正在读取模拟数据…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="table-note" id="events-status" role="status"></p>
+    </section>
+
+    <section class="step" aria-labelledby="step-count">
+      <div class="step-head"><span class="step-number">2</span><div><h2 id="step-count">选范围，统计次数</h2><p>先选“近几天”，再点按钮。Python 会筛选记录并数出每类告警有几次。</p></div></div>
+      <div class="controls">
+        <div class="choices" role="group" aria-label="统计范围">
+          <label><input type="radio" name="range" value="1"><span>近 1 天</span></label>
+          <label><input type="radio" name="range" value="7" checked><span>近 7 天</span></label>
+          <label><input type="radio" name="range" value="30"><span>近 30 天</span></label>
+        </div>
+        <button id="count-button" type="button">统计告警</button>
+      </div>
+      <p class="status" id="count-status" role="status">选好范围后，点“统计告警”。</p>
+      <div class="result" id="count-result" hidden>
+        <div class="total-box"><strong id="total-count"></strong><span id="total-label"></span></div>
+        <div class="result-detail">
+          <h3>统计结果</h3>
+          <p id="type-counts"></p>
+          <p id="local-summary"></p>
+          <p class="fact-note">这些数字由 Python 算出，不是 AI 猜的。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" aria-labelledby="step-ai">
+      <div class="step-head"><span class="step-number">3</span><div><h2 id="step-ai">让 AI 写说明（可选）</h2><p>这一步只把第 2 步算好的事实交给模型，让它用自然语言表述。</p></div></div>
+      <div class="ai-panel">
+        <button id="ai-button" type="button" disabled>生成 AI 摘要</button>
+        <p id="ai-help">先完成第 2 步，再决定是否尝试 AI。</p>
+      </div>
+      <p class="status" id="ai-status" role="status"></p>
+      <div class="ai-result" id="ai-result" hidden></div>
+    </section>
+
+    <div class="flow"><strong>你刚才做了什么？</strong> 点击按钮 → 网页把范围发给 FastAPI → Python 读取模拟数据并统计 → 网页显示结果。</div>
+    <footer>需要检查原始接口时再打开 <a href="/docs">开发者接口文档</a>；初次学习只用这个页面就够了。</footer>
+  </main>
+  <script>
+    const typeLabels = { fall: "跌倒", offline: "设备离线", signal_low: "信号偏弱" };
+    const $ = (id) => document.getElementById(id);
+    let lastRange = null;
+    let aiAvailable = false;
+
+    function describeDay(days) {
+      if (days === 0) return "今天";
+      if (days === 1) return "昨天";
+      return `${days} 天前`;
+    }
+
+    async function readJson(url, options) {
+      const response = await fetch(url, options);
+      if (!response.ok) throw new Error(`请求失败（${response.status}）`);
+      return response.json();
+    }
+
+    async function loadEvents() {
+      try {
+        const data = await readJson("/api/events");
+        const rows = $("event-rows");
+        rows.replaceChildren();
+        data.items.forEach((event, index) => {
+          const row = document.createElement("tr");
+          [`第 ${index + 1} 条`, typeLabels[event.type] || event.type, describeDay(event.days_ago)]
+            .forEach((value) => {
+              const cell = document.createElement("td");
+              cell.textContent = value;
+              row.append(cell);
+            });
+          rows.append(row);
+        });
+        $("events-status").textContent = "上面是练习数据，时间按“今天、昨天、几天前”计算。";
+      } catch {
+        $("event-rows").replaceChildren();
+        $("events-status").textContent = "模拟数据暂时加载失败，请刷新页面再试。";
+      }
+    }
+
+    async function loadAiStatus() {
+      try {
+        const data = await readJson("/api/config");
+        aiAvailable = data.ai_available;
+      } catch {
+        aiAvailable = false;
+      }
+      updateAiButton();
+    }
+
+    function updateAiButton() {
+      $("ai-button").disabled = !aiAvailable || lastRange === null;
+      $("ai-help").textContent = !aiAvailable
+        ? "本机尚未配置模型密钥；统计功能可以照常使用。密钥配置方法见项目说明。"
+        : lastRange === null
+          ? "先完成第 2 步，才能把统计事实交给 AI。"
+          : "已准备好：点击后会调用模型 API，生成两句说明。";
+    }
+
+    $("count-button").addEventListener("click", async () => {
+      const range = Number(document.querySelector('input[name="range"]:checked').value);
+      $("count-button").disabled = true;
+      $("count-status").textContent = "正在让 Python 统计模拟告警…";
+      $("count-result").hidden = true;
+      $("ai-result").hidden = true;
+      lastRange = null;
+      updateAiButton();
+      try {
+        const data = await readJson("/api/summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ range_days: range })
+        });
+        const facts = data.facts;
+        $("total-count").textContent = facts.total;
+        $("total-label").textContent = `近 ${facts.range_days} 天告警总数`;
+        const parts = Object.entries(facts.by_type)
+          .map(([type, count]) => `${typeLabels[type] || type} ${count} 次`);
+        $("type-counts").textContent = parts.length ? parts.join("，") : "这段时间没有告警。";
+        $("local-summary").textContent = data.summary;
+        $("count-result").hidden = false;
+        $("count-status").textContent = "统计完成。可以换一个天数再试。";
+        lastRange = range;
+      } catch {
+        $("count-status").textContent = "统计失败，请确认本地服务还在运行，再试一次。";
+      } finally {
+        $("count-button").disabled = false;
+        updateAiButton();
+      }
+    });
+
+    $("ai-button").addEventListener("click", async () => {
+      if (lastRange === null || !aiAvailable) return;
+      $("ai-button").disabled = true;
+      $("ai-status").textContent = "正在请求模型，请稍等…";
+      $("ai-result").hidden = true;
+      try {
+        const data = await readJson("/api/ai-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ range_days: lastRange })
+        });
+        $("ai-result").textContent = data.summary;
+        $("ai-result").hidden = false;
+        $("ai-status").textContent = "模型已返回说明；请对照第 2 步检查次数是否一致。";
+      } catch {
+        $("ai-status").textContent = "模型调用失败。请检查本机密钥、网络和额度；第 2 步的统计结果不受影响。";
+      } finally {
+        updateAiButton();
+      }
+    });
+
+    loadEvents();
+    loadAiStatus();
+  </script>
+</body>
+</html>
