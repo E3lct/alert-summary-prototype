@@ -1,0 +1,8 @@
+[
+  {"id": "demo-001", "type": "fall", "days_ago": 0},
+  {"id": "demo-002", "type": "offline", "days_ago": 1},
+  {"id": "demo-003", "type": "fall", "days_ago": 2},
+  {"id": "demo-004", "type": "offline", "days_ago": 6},
+  {"id": "demo-005", "type": "fall", "days_ago": 8},
+  {"id": "demo-006", "type": "signal_low", "days_ago": 12}
+]
